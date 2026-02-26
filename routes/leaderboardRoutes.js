@@ -5,9 +5,19 @@ const router = express.Router();
 
 router.get("/global", async (req, res) => {
   try {
-    const users = await User.find().sort({ points: -1 }).limit(50);
-    res.json(users);
+    // BUG FIX: never return full user objects — exclude password and sensitive fields.
+    const users = await User
+      .find()
+      .select('name email points accuracy totalSolved easySolved mediumSolved hardSolved streak rank avatar')
+      .sort({ points: -1 })
+      .limit(50)
+      .lean();
+
+    // Attach rank position
+    const ranked = users.map((u, i) => ({ ...u, rank: i + 1 }));
+    res.json({ success: true, users: ranked });
   } catch (error) {
+    console.error('Leaderboard error:', error);
     res.status(500).json({ error: error.message });
   }
 });

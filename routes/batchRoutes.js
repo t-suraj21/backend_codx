@@ -39,24 +39,24 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // GET /batches/:id/leaderboard - Get batch leaderboard
 router.get('/:id/leaderboard', authMiddleware, async (req, res) => {
   try {
+    // BUG FIX: Mongoose .populate() does NOT support `options: { sort }` on populated docs.
+    // Sort the array in JS after population instead.
     const batch = await Batch.findById(req.params.id)
-      .populate({
-        path: 'students',
-        select: 'name email points accuracy',
-        options: { sort: { points: -1 } }
-      });
-    
+      .populate('students', 'name email points accuracy totalSolved streak avatar');
+
     if (!batch) {
       return res.status(404).json({ error: 'Batch not found' });
     }
-    
-    // Add rank to each student
-    const studentsWithRank = batch.students.map((student, index) => ({
+
+    // Sort by points descending, then assign rank
+    const sorted = [...batch.students].sort((a, b) => (b.points || 0) - (a.points || 0));
+    const studentsWithRank = sorted.map((student, index) => ({
       ...student.toObject(),
       rank: index + 1,
     }));
-    
+
     res.json({
+      success: true,
       batchName: batch.name,
       students: studentsWithRank,
     });

@@ -80,8 +80,12 @@ router.post('/submit', authMiddleware, codeExecutionLimiter, codeSubmissionValid
     const result = await judge0Service.runTestCases(code, language, allTestCases);
 
     // Check if user already solved this question
+    // BUG FIX: solvedQuestions stores ObjectIds; must use .toString() comparison
+    // because req.body.questionId is a plain string — .includes() always returned false.
     const user = await User.findById(userId);
-    const alreadySolved = user.solvedQuestions.includes(questionId);
+    const alreadySolved = user.solvedQuestions.some(
+      id => id.toString() === questionId.toString()
+    );
 
     // Create submission record
     const submission = await Submission.create({
@@ -105,6 +109,9 @@ router.post('/submit', authMiddleware, codeExecutionLimiter, codeSubmissionValid
     const lastSubmission = user.lastSubmissionDate;
 
     // Update streak
+    // BUG FIX: daysDiff === 0 means same-day resubmit — do nothing (streak already counted).
+    // daysDiff === 1 → consecutive day → increment.
+    // daysDiff > 1  → gap → reset to 1.
     if (lastSubmission) {
       const daysDiff = Math.floor((now - lastSubmission) / (1000 * 60 * 60 * 24));
       if (daysDiff === 1) {
@@ -112,10 +119,12 @@ router.post('/submit', authMiddleware, codeExecutionLimiter, codeSubmissionValid
         user.maxStreak = Math.max(user.maxStreak, user.streak);
       } else if (daysDiff > 1) {
         user.streak = 1;
+        user.maxStreak = Math.max(user.maxStreak, user.streak);
       }
+      // daysDiff === 0: same day, streak unchanged
     } else {
       user.streak = 1;
-      user.maxStreak = 1;
+      user.maxStreak = Math.max(user.maxStreak || 0, 1);
     }
     user.lastSubmissionDate = now;
 

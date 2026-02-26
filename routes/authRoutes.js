@@ -201,11 +201,14 @@ router.post("/register", async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: "All fields are required" });
     }
-    const existingUser = await User.findOne({ email });
+    // BUG FIX: normalise email to lowercase so the same address can't register twice
+    // with different capitalisation (e.g. User@Gmail.com vs user@gmail.com).
+    const emailNorm = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: emailNorm });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "Email already registered" });
     }
-    const user = await User.create({ name, email, password });
+    const user = await User.create({ name: name.trim(), email: emailNorm, password });
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "secret", { expiresIn: "30d" });
     res.status(201).json({ token, user: { _id: user._id, name: user.name, email: user.email, points: 0, accuracy: 0 } });
   } catch (error) {
@@ -222,7 +225,7 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(400).json({ error: "User not found" });
 
     // Social-only accounts don't have a password

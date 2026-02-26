@@ -22,7 +22,20 @@ const submissionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Accepted', 'Wrong Answer', 'Runtime Error', 'Time Limit Exceeded', 'Compilation Error', 'Memory Limit Exceeded', 'Pending', 'Running'],
+    // BUG FIX: added 'Internal Error' and 'Exec Format Error' to match all
+    // possible statuses returned by judge0Service after normalisation.
+    enum: [
+      'Accepted',
+      'Wrong Answer',
+      'Runtime Error',
+      'Time Limit Exceeded',
+      'Compilation Error',
+      'Memory Limit Exceeded',
+      'Internal Error',
+      'Exec Format Error',
+      'Pending',
+      'Running',
+    ],
     required: true,
   },
   passedTestCases: {

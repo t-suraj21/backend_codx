@@ -162,6 +162,8 @@ class Judge0Service {
    * @returns {Object} Formatted result
    */
   formatResult(data) {
+    // BUG FIX: statuses 7-12 are all runtime error variants.
+    // Normalise them to 'Runtime Error' so Submission model enum validation passes.
     const statusMap = {
       1: 'In Queue',
       2: 'Processing',
@@ -169,12 +171,12 @@ class Judge0Service {
       4: 'Wrong Answer',
       5: 'Time Limit Exceeded',
       6: 'Compilation Error',
-      7: 'Runtime Error (SIGSEGV)',
-      8: 'Runtime Error (SIGXFSZ)',
-      9: 'Runtime Error (SIGFPE)',
-      10: 'Runtime Error (SIGABRT)',
-      11: 'Runtime Error (NZEC)',
-      12: 'Runtime Error (Other)',
+      7: 'Runtime Error',
+      8: 'Runtime Error',
+      9: 'Runtime Error',
+      10: 'Runtime Error',
+      11: 'Runtime Error',
+      12: 'Runtime Error',
       13: 'Internal Error',
       14: 'Exec Format Error',
     };

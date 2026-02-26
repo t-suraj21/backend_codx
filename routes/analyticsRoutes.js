@@ -51,13 +51,15 @@ router.get('/', authMiddleware, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // All user submissions, newest first, populate question + topic
+    // All user submissions, newest first, populate question + topic + language
     const submissions = await Submission.find({ user: userId })
       .populate({
         path: 'question',
         select: 'title difficulty topic points',
         populate: { path: 'topic', select: 'name' },
       })
+      // BUG FIX: language was not populated — it showed as an ObjectId string in recentSubmissions.
+      .populate('language', 'name code')
       .sort({ createdAt: -1 });
 
     // ── Difficulty breakdown (count distinct accepted problems) ──────────────
@@ -112,7 +114,7 @@ router.get('/', authMiddleware, async (req, res) => {
       difficulty: sub.question?.difficulty || 'Unknown',
       status: sub.isAccepted ? 'Accepted' : (sub.status || 'Wrong Answer'),
       accuracy: sub.accuracy || 0,
-      language: sub.language,
+      language: sub.language?.name || sub.language?.code || 'Unknown',
       timeAgo: timeAgo(sub.createdAt),
       date: sub.createdAt,
     }));

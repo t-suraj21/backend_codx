@@ -1,42 +1,46 @@
 import nodemailer from "nodemailer";
 
 /**
- * Create a reusable Gmail transporter using explicit SMTP settings.
- * Port 587 + STARTTLS is the most reliable configuration for Gmail.
+ * Create a Gmail transporter.
+ * Uses port 465 (SSL) which is the most reliable on cloud servers like Render.
+ * Port 587 (STARTTLS) can hang or be blocked on some cloud providers.
  */
 const createTransporter = () => {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
 
   if (!user || !pass) {
-    return null; // dev fallback: log OTP to console
+    return null;
   }
 
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,       // STARTTLS — upgrades connection after handshake
+    service: "gmail",          // let nodemailer pick the correct Gmail settings
     auth: { user, pass },
+    connectionTimeout: 10_000, // fail fast — don't hang for 60 s
+    greetingTimeout:   10_000,
+    socketTimeout:     15_000,
     tls: {
-      rejectUnauthorized: false, // avoids cert errors on some networks
+      rejectUnauthorized: false,
     },
   });
 };
 
 /**
  * Send OTP verification email to the user's email address.
- * Each user receives the OTP on THEIR OWN email they registered with.
  *
- * @param {string} to  - the user's email address (from the registration form)
+ * @param {string} to  - the user's email address
  * @param {string} otp - 6-digit OTP code
  */
 export const sendOtpEmail = async (to, otp) => {
   const transporter = createTransporter();
 
   if (!transporter) {
-    // Dev fallback — no email credentials configured
-    console.log(`\n📧 [DEV] OTP for ${to}: ${otp} (expires in 10 minutes)\n`);
-    return;
+    // EMAIL_USER / EMAIL_PASS not set in Render environment variables
+    const err = new Error(
+      "Email service not configured. Set EMAIL_USER and EMAIL_PASS in Render environment variables."
+    );
+    console.error("❌ Email config missing:", err.message);
+    throw err;
   }
 
   const mailOptions = {
@@ -122,7 +126,12 @@ export const sendOtpEmail = async (to, otp) => {
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    // Race the send against a hard 20-second timeout
+    const sendPromise = transporter.sendMail(mailOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("SMTP timeout — email server did not respond within 20 s")), 20_000)
+    );
+    const info = await Promise.race([sendPromise, timeoutPromise]);
     console.log(`✅ OTP email sent to ${to} | MessageId: ${info.messageId}`);
   } catch (err) {
     console.error(`❌ Failed to send OTP to ${to}:`, err.message);
